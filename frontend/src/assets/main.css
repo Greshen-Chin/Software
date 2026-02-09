@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* Jika kamu ingin menambahkan custom style setelah import tailwind */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
