@@ -36,4 +36,21 @@ export class Task {
     if (this._status === TaskStatus.EXPIRED) throw new Error("Task sudah expired!");
     this._status = TaskStatus.DONE;
   }
+
+  public start() {
+    if (!this.canBeUpdated()) {
+      throw new Error("Task tidak dapat diubah statusnya");
+    }
+    this._status = TaskStatus.IN_PROGRESS;
+  }
+
+  public updateStatus(newStatus: TaskStatus) {
+    if (!this.canBeUpdated()) {
+      throw new Error("Task tidak dapat diubah statusnya");
+    }
+    if (newStatus === TaskStatus.EXPIRED || newStatus === TaskStatus.DONE) {
+      throw new Error("Status tidak valid untuk update manual");
+    }
+    this._status = newStatus;
+  }
 }

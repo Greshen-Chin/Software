@@ -1,14 +1,96 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
-generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
-}
+// prisma/schema.prisma
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+
+  // Relasi Tugas
+  tasks     Task[]
+  
+  // Relasi Jadwal
+  schedules Schedule[]
+
+  // Fitur Pertemanan (Self-relation Many-to-Many)
+  friends   UserFriend[] @relation("UserFriends")
+  friendOf  UserFriend[] @relation("FriendOf")
+
+  // Fitur Grup
+  groups    Group[]  @relation("UserGroups")
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  // Relasi Many-to-Many ke User
+  members   User[]   @relation("UserGroups")
+  
+  // Tugas khusus untuk grup
+  tasks     Task[]
+
+  // Jadwal grup
+  schedules Schedule[]
+}
+
+model Task {
+  id        String   @id @default(uuid())
+  title     String
+  deadline  DateTime
+  status    String   @default("TODO") // TODO, IN_PROGRESS, DONE, EXPIRED
+  priority  Int      @default(2)      // 1: Low, 2: Med, 3: High
+  createdAt DateTime @default(now())
+
+  // Relasi ke User (Tugas Pribadi)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+
+  // Relasi ke Group (Tugas Grup)
+  groupId   String?
+  group     Group?   @relation(fields: [groupId], references: [id])
+}
+
+model Schedule {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  type        String   @default("EVENT") // EVENT, MEETING, TASK_REMINDER
+  color       String   @default("purple") // purple, blue, green, orange, red
+  createdAt   DateTime @default(now())
+
+  // Relasi ke User
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  // Relasi ke Group (opsional)
+  groupId     String?
+  group       Group?   @relation(fields: [groupId], references: [id])
+}
+
+model UserFriend {
+  id          String   @id @default(uuid())
+  userId      String
+  friendId    String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend      User     @relation("FriendOf", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
 }

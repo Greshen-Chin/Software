@@ -1,6 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException } from '@nestjs/common';
 import { Task, TaskStatus } from '../../domain/task.entity';
-import { ITaskRepository } from '../../domain/task.repository.interface';
+import type { ITaskRepository } from '../../domain/task.repository.interface';
+import { CreateTaskDto } from '../../presentation/dto/create-task.dto';
 
 @Injectable()
 export class CreateTaskUseCase {
@@ -8,9 +9,13 @@ export class CreateTaskUseCase {
     @Inject('ITaskRepository') private readonly taskRepo: ITaskRepository,
   ) {}
 
-  async execute(data: { title: string; deadline: Date; priority: number }) {
+  async execute(data: CreateTaskDto, userId: string): Promise<Task> {
+    if (!userId) {
+      throw new BadRequestException('User ID diperlukan');
+    }
+    
     if (new Date(data.deadline) < new Date()) {
-      throw new Error("Deadline tidak boleh di masa lalu!");
+      throw new BadRequestException("Deadline tidak boleh di masa lalu!");
     }
 
     const newTask = new Task(
@@ -21,6 +26,7 @@ export class CreateTaskUseCase {
       TaskStatus.TODO
     );
 
-    return await this.taskRepo.save(newTask);
+    await this.taskRepo.save(newTask, userId);
+    return newTask;
   }
 }
