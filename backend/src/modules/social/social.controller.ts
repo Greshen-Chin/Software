@@ -48,6 +48,47 @@ export class SocialController {
     return users;
   }
 
+  @Post('friends/search-name')
+  async searchUsersByName(@Body('name') name: string, @CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const q = (name || '').trim();
+    if (!q) {
+      throw new BadRequestException('Nama harus diisi');
+    }
+    const users = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+        ],
+        id: { not: user.sub },
+      },
+      select: { id: true, name: true, email: true },
+      take: 10,
+    });
+    return users;
+  }
+
+  @Post('friends/search-id')
+  async searchUsersById(@Body('id') id: string, @CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    if (!id) {
+      throw new BadRequestException('ID harus diisi');
+    }
+    const userFound = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, email: true },
+    });
+    if (!userFound || userFound.id === user.sub) {
+      return [];
+    }
+    return [userFound];
+  }
+
   @Post('friends/add')
   async addFriend(@Body('friendId') friendId: string, @CurrentUser() user: any) {
     if (!user?.sub) {
@@ -100,10 +141,25 @@ export class SocialController {
       throw new BadRequestException('User tidak terautentikasi');
     }
     const groups = await this.prisma.group.findMany({
-      where: { members: { some: { id: user.sub } } },
-      include: { members: { select: { id: true, name: true, email: true } } },
+      where: { members: { some: { userId: user.sub } } },
+      include: {
+        members: {
+          include: { user: { select: { id: true, name: true, email: true } } },
+        },
+      },
     });
-    return groups;
+    return groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      createdAt: g.createdAt,
+      members: g.members.map((m) => ({
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        role: m.role,
+        canCreateSchedule: m.canCreateSchedule,
+      })),
+    }));
   }
 
   @Post('groups')
@@ -114,19 +170,40 @@ export class SocialController {
     if (!name) {
       throw new BadRequestException('Nama grup harus diisi');
     }
-    return await this.prisma.group.create({
-      data: {
-        name,
-        members: { connect: { id: user.sub } },
-      },
-      include: { members: { select: { id: true, name: true, email: true } } },
+    const group = await this.prisma.group.create({
+      data: { name },
     });
+    await this.prisma.groupMember.create({
+      data: {
+        groupId: group.id,
+        userId: user.sub,
+        role: 'ADMIN',
+        canCreateSchedule: true,
+      },
+    });
+    const members = await this.prisma.groupMember.findMany({
+      where: { groupId: group.id },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    return {
+      id: group.id,
+      name: group.name,
+      createdAt: group.createdAt,
+      members: members.map((m) => ({
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        role: m.role,
+        canCreateSchedule: m.canCreateSchedule,
+      })),
+    };
   }
 
   @Post('groups/:groupId/members')
   async addMemberToGroup(
     @Param('groupId') groupId: string,
     @Body('userId') memberId: string,
+    @Body('canCreateSchedule') canCreateSchedule: boolean,
     @CurrentUser() user: any,
   ) {
     if (!user?.sub) {
@@ -135,23 +212,60 @@ export class SocialController {
     if (!memberId) {
       throw new BadRequestException('userId harus diisi');
     }
-    
-    // Verify group exists and user is a member
-    const group = await this.prisma.group.findFirst({
-      where: {
-        id: groupId,
-        members: { some: { id: user.sub } },
-      },
+
+    // Verify group exists and current user is admin
+    const adminMember = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: user.sub, role: 'ADMIN' },
     });
-    
-    if (!group) {
-      throw new BadRequestException('Grup tidak ditemukan atau Anda bukan anggota');
+
+    if (!adminMember) {
+      throw new BadRequestException('Hanya admin yang bisa menambah anggota');
     }
 
-    return await this.prisma.group.update({
-      where: { id: groupId },
-      data: { members: { connect: { id: memberId } } },
-      include: { members: { select: { id: true, name: true, email: true } } },
+    // Ensure target user exists
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: memberId },
     });
+    if (!targetUser) {
+      throw new BadRequestException('User tidak ditemukan');
+    }
+
+    await this.prisma.groupMember.upsert({
+      where: { userId_groupId: { userId: memberId, groupId } },
+      update: {
+        canCreateSchedule: !!canCreateSchedule,
+      },
+      create: {
+        userId: memberId,
+        groupId,
+        role: 'MEMBER',
+        canCreateSchedule: !!canCreateSchedule,
+      },
+    });
+
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      include: {
+        members: {
+          include: { user: { select: { id: true, name: true, email: true } } },
+        },
+      },
+    });
+    if (!group) {
+      throw new BadRequestException('Grup tidak ditemukan');
+    }
+
+    return {
+      id: group.id,
+      name: group.name,
+      createdAt: group.createdAt,
+      members: group.members.map((m) => ({
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        role: m.role,
+        canCreateSchedule: m.canCreateSchedule,
+      })),
+    };
   }
 }

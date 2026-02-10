@@ -1,9 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useScheduleStore } from '../stores/scheduleStore';
+import { useSocialStore } from '../stores/socialStore';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next';
 
 const scheduleStore = useScheduleStore();
+const socialStore = useSocialStore();
 
 const currentDate = ref(new Date());
 const viewMode = ref<'day' | 'week' | 'month'>('week');
@@ -15,6 +17,7 @@ const newSchedule = ref({
   type: 'EVENT',
   color: 'purple',
   description: '',
+  groupId: '',
 });
 
 const weekStart = computed(() => {
@@ -76,9 +79,15 @@ const formatTime = (dateString: string) => {
   return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 };
 
-const navigateWeek = (direction: number) => {
+const navigatePeriod = (direction: number) => {
   const newDate = new Date(currentDate.value);
-  newDate.setDate(newDate.getDate() + direction * 7);
+  if (viewMode.value === 'day') {
+    newDate.setDate(newDate.getDate() + direction);
+  } else if (viewMode.value === 'week') {
+    newDate.setDate(newDate.getDate() + direction * 7);
+  } else {
+    newDate.setMonth(newDate.getMonth() + direction);
+  }
   currentDate.value = newDate;
 };
 
@@ -107,6 +116,21 @@ const formatWeekRange = computed(() => {
   return `${start.getDate()} ${start.toLocaleDateString('id-ID', { month: 'short' })} - ${end.getDate()} ${end.toLocaleDateString('id-ID', { month: 'short' })} ${end.getFullYear()}`;
 });
 
+const displayRange = computed(() => {
+  if (viewMode.value === 'day') {
+    return currentDate.value.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+  if (viewMode.value === 'month') {
+    return formatMonthYear.value;
+  }
+  return formatWeekRange.value;
+});
+
 const getColorClass = (color: string) => {
   const colors: Record<string, string> = {
     purple: 'bg-purple-100 text-purple-700 border-purple-200',
@@ -119,8 +143,26 @@ const getColorClass = (color: string) => {
 };
 
 const handleSubmit = async () => {
+  if (!newSchedule.value.startTime || !newSchedule.value.endTime) {
+    alert('Waktu mulai dan selesai harus diisi');
+    return;
+  }
+  const start = new Date(newSchedule.value.startTime);
+  const end = new Date(newSchedule.value.endTime);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    alert('Format waktu tidak valid');
+    return;
+  }
+  if (start >= end) {
+    alert('Waktu mulai harus sebelum waktu selesai');
+    return;
+  }
   try {
-    await scheduleStore.addSchedule(newSchedule.value);
+    const payload = {
+      ...newSchedule.value,
+      groupId: newSchedule.value.groupId || undefined,
+    };
+    await scheduleStore.addSchedule(payload);
     isModalOpen.value = false;
     newSchedule.value = {
       title: '',
@@ -129,6 +171,7 @@ const handleSubmit = async () => {
       type: 'EVENT',
       color: 'purple',
       description: '',
+      groupId: '',
     };
   } catch (error: any) {
     alert(error.message || 'Gagal menambah jadwal');
@@ -137,6 +180,7 @@ const handleSubmit = async () => {
 
 onMounted(() => {
   scheduleStore.fetchSchedules();
+  socialStore.fetchGroups();
 });
 </script>
 
@@ -209,7 +253,7 @@ onMounted(() => {
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <button
-            @click="navigateWeek(-1)"
+            @click="navigatePeriod(-1)"
             class="p-2 hover:bg-slate-100 rounded-xl transition"
           >
             <ChevronLeft class="w-5 h-5" />
@@ -221,12 +265,12 @@ onMounted(() => {
             Today
           </button>
           <button
-            @click="navigateWeek(1)"
+            @click="navigatePeriod(1)"
             class="p-2 hover:bg-slate-100 rounded-xl transition"
           >
             <ChevronRight class="w-5 h-5" />
           </button>
-          <span class="font-bold text-lg">{{ formatMonthYear }}</span>
+          <span class="font-bold text-lg">{{ displayRange }}</span>
         </div>
 
         <div class="flex items-center gap-2">
@@ -265,7 +309,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <div class="text-sm font-bold text-slate-600">{{ formatWeekRange }}</div>
+        <div class="text-sm font-bold text-slate-600">{{ viewMode.toUpperCase() }}</div>
       </div>
     </div>
 
@@ -305,7 +349,7 @@ onMounted(() => {
               :key="hour"
               class="h-16 border-b border-slate-100 flex items-start justify-end pr-4 pt-1"
             >
-              <span class="text-xs text-slate-500">{{ hour.toString().padStart(2, '0') }:00</span>
+              <span class="text-xs text-slate-500">{{ hour.toString().padStart(2, '0') }}:00</span>
             </div>
           </div>
 
@@ -333,6 +377,89 @@ onMounted(() => {
                   {{ formatTime(schedule.endTime) }}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Day View -->
+    <div v-else-if="viewMode === 'day'" class="overflow-x-auto">
+      <div class="min-w-[800px]">
+        <div class="grid grid-cols-2 border-b-2 border-slate-200 pb-2 mb-2">
+          <div class="text-xs font-bold text-slate-400 uppercase">Time</div>
+          <div class="text-center">
+            <div class="text-xs font-bold text-slate-400 uppercase">
+              {{ formatDateHeader(currentDate).day }}
+            </div>
+            <div class="text-lg font-black mt-1 text-slate-900">
+              {{ formatDateHeader(currentDate).date }}
+            </div>
+          </div>
+        </div>
+        <div class="relative" style="min-height: 960px;">
+          <div class="absolute left-0 top-0 w-20">
+            <div
+              v-for="hour in Array.from({ length: 16 }, (_, i) => i + 8)"
+              :key="hour"
+              class="h-16 border-b border-slate-100 flex items-start justify-end pr-4 pt-1"
+            >
+              <span class="text-xs text-slate-500">{{ hour.toString().padStart(2, '0') }}:00</span>
+            </div>
+          </div>
+          <div class="ml-20 border-l border-slate-100 relative" style="min-height: 960px;">
+            <div
+              v-for="schedule in getSchedulesForDay(currentDate)"
+              :key="schedule.id"
+              :class="[
+                'absolute left-2 right-2 rounded-lg p-2 text-xs font-bold border-2 cursor-pointer hover:shadow-md transition z-10',
+                getColorClass(schedule.color),
+              ]"
+              :style="getSchedulePosition(schedule)"
+            >
+              <div class="font-bold truncate">{{ schedule.title }}</div>
+              <div class="text-[10px] opacity-75 mt-1">
+                {{ formatTime(schedule.startTime) }} -
+                {{ formatTime(schedule.endTime) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Month View -->
+    <div v-else class="bg-white rounded-3xl border border-slate-100 p-4">
+      <div class="grid grid-cols-7 gap-2 text-xs font-bold text-slate-400 uppercase mb-2">
+        <div v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d" class="text-center">{{ d }}</div>
+      </div>
+      <div class="grid grid-cols-7 gap-2">
+        <div
+          v-for="cell in Array.from({ length: 42 }, (_, i) => i)"
+          :key="cell"
+          class="min-h-[90px] rounded-2xl border border-slate-100 p-2"
+        >
+          <div class="text-xs font-bold text-slate-500">
+            {{ (() => {
+              const first = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+              const startDay = first.getDay();
+              const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1 - startDay + cell);
+              return date.getDate();
+            })() }}
+          </div>
+          <div class="mt-1 space-y-1">
+            <div
+              v-for="schedule in (() => {
+                const first = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                const startDay = first.getDay();
+                const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1 - startDay + cell);
+                return getSchedulesForDay(date).slice(0, 2);
+              })()"
+              :key="schedule.id"
+              class="text-[10px] rounded-md px-2 py-1 truncate"
+              :class="getColorClass(schedule.color)"
+            >
+              {{ schedule.title }}
             </div>
           </div>
         </div>
@@ -396,6 +523,20 @@ onMounted(() => {
             <option value="EVENT">Event</option>
             <option value="MEETING">Meeting</option>
             <option value="TASK_REMINDER">Task Reminder</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-400 mb-2">
+            Grup (opsional)
+          </label>
+          <select
+            v-model="newSchedule.groupId"
+            class="w-full border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none"
+          >
+            <option value="">Pribadi</option>
+            <option v-for="g in socialStore.groups" :key="g.id" :value="g.id">
+              {{ g.name }}
+            </option>
           </select>
         </div>
         <div>

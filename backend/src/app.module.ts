@@ -6,9 +6,19 @@ import { TaskModule } from './modules/task/task.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { SocialModule } from './modules/social/social.module';
+import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
+import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
-  imports: [PrismaModule, TaskModule, AuthModule, ScheduleModule, SocialModule],
+  imports: [
+    PrismaModule,
+    NestScheduleModule.forRoot(),
+    TaskModule,
+    AuthModule,
+    ScheduleModule,
+    SocialModule,
+    ChatModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

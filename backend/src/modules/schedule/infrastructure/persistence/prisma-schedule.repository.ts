@@ -46,8 +46,18 @@ export class PrismaScheduleRepository implements IScheduleRepository {
   }
 
   async findByUserId(userId: string): Promise<Schedule[]> {
-    const list = await this.prisma.schedule.findMany({
+    const memberships = await this.prisma.groupMember.findMany({
       where: { userId },
+      select: { groupId: true },
+    });
+    const groupIds = memberships.map((m) => m.groupId);
+    const list = await this.prisma.schedule.findMany({
+      where: {
+        OR: [
+          { userId },
+          ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+        ],
+      },
       orderBy: { startTime: 'asc' },
     });
     return list.map((item) => this.toDomain(item));

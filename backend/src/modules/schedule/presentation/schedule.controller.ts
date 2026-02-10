@@ -14,6 +14,7 @@ import type { IScheduleRepository } from '../domain/schedule.repository.interfac
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/user.decorator';
+import { PrismaService } from '../../../../prisma/prisma.service';
 
 @Controller('schedules')
 @UseGuards(JwtAuthGuard)
@@ -22,6 +23,7 @@ export class ScheduleController {
     private readonly createSchedule: CreateScheduleUseCase,
     @Inject('IScheduleRepository')
     private readonly scheduleRepo: IScheduleRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get()
@@ -56,6 +58,17 @@ export class ScheduleController {
   async create(@Body() dto: CreateScheduleDto, @CurrentUser() user: any) {
     if (!user?.sub) {
       throw new BadRequestException('User tidak terautentikasi');
+    }
+    if (dto.groupId) {
+      const member = await this.prisma.groupMember.findFirst({
+        where: { groupId: dto.groupId, userId: user.sub },
+      });
+      if (!member) {
+        throw new BadRequestException('Anda bukan anggota grup ini');
+      }
+      if (member.role !== 'ADMIN' && !member.canCreateSchedule) {
+        throw new BadRequestException('Anda tidak memiliki akses membuat jadwal grup');
+      }
     }
     return await this.createSchedule.execute(dto, user.sub);
   }

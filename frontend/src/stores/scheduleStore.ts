@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import api from '../lib/api';
 
-const API_URL = 'http://localhost:3000/schedules';
+const API_URL = '/schedules';
 
 export const useScheduleStore = defineStore('schedule', {
   state: () => ({
@@ -17,7 +17,7 @@ export const useScheduleStore = defineStore('schedule', {
   actions: {
     async fetchSchedules() {
       try {
-        const res = await axios.get(API_URL);
+        const res = await api.get(API_URL);
         this.schedules = res.data || [];
       } catch (e: any) {
         console.error('Gagal load schedules', e);
@@ -30,7 +30,7 @@ export const useScheduleStore = defineStore('schedule', {
     },
     async addSchedule(schedule: any) {
       try {
-        await axios.post(API_URL, schedule);
+        await api.post(API_URL, schedule);
         await this.fetchSchedules();
       } catch (e: any) {
         const errorMsg = e.response?.data?.message || 'Gagal menambah jadwal';
@@ -39,7 +39,7 @@ export const useScheduleStore = defineStore('schedule', {
     },
     async deleteSchedule(id: string) {
       try {
-        await axios.delete(`${API_URL}/${id}`);
+        await api.delete(`${API_URL}/${id}`);
         await this.fetchSchedules();
       } catch (e: any) {
         const errorMsg = e.response?.data?.message || 'Gagal menghapus schedule';

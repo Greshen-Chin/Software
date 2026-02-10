@@ -4,8 +4,12 @@ import Calendar from '../views/Calendar.vue';
 import Auth from '../views/Auth.vue';
 
 const routes = [
-  { 
-    path: '/', 
+  {
+    path: '/',
+    redirect: '/login'
+  },
+  {
+    path: '/dashboard',
     name: 'Dashboard',
     component: Dashboard,
     meta: { requiresAuth: true }

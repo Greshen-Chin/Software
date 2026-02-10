@@ -5,6 +5,7 @@ import { PrismaScheduleRepository } from './infrastructure/persistence/prisma-sc
 import { IScheduleRepository } from './domain/schedule.repository.interface';
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { JwtModule } from '@nestjs/jwt';
   controllers: [ScheduleController],
   providers: [
     CreateScheduleUseCase,
+    JwtAuthGuard,
     {
       provide: 'IScheduleRepository',
       useClass: PrismaScheduleRepository,

@@ -3,13 +3,13 @@ import { IsString, IsNotEmpty, IsDateString, IsNumber, Min, Max } from 'class-va
 export class CreateTaskDto {
   @IsString()
   @IsNotEmpty()
-  title: string;
+  title!: string;
 
   @IsDateString()
-  deadline: string;
+  deadline!: string;
 
   @IsNumber()
   @Min(1)
   @Max(3)
-  priority: number;
+  priority!: number;
 }

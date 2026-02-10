@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import api from '../lib/api';
 
-const API_URL = 'http://localhost:3000/tasks';
+const API_URL = '/tasks';
 
 export const useTaskStore = defineStore('task', {
   state: () => ({
@@ -17,7 +17,7 @@ export const useTaskStore = defineStore('task', {
   actions: {
     async fetchTasks() {
       try {
-        const res = await axios.get(API_URL);
+        const res = await api.get(API_URL);
         this.tasks = res.data || [];
       } catch (e: any) {
         console.error("Gagal load data", e);
@@ -29,7 +29,7 @@ export const useTaskStore = defineStore('task', {
     },
     async addTask(task: any) {
       try {
-        await axios.post(API_URL, task);
+        await api.post(API_URL, task);
         await this.fetchTasks();
       } catch (e: any) {
         const errorMsg = e.response?.data?.message || 'Gagal menambah task';
@@ -38,7 +38,7 @@ export const useTaskStore = defineStore('task', {
     },
     async completeTask(id: string) {
       try {
-        await axios.patch(`${API_URL}/${id}/status`, { status: 'DONE' });
+        await api.patch(`${API_URL}/${id}/status`, { status: 'DONE' });
         await this.fetchTasks();
       } catch (err: any) {
         const errorMsg = err.response?.data?.message || "Gagal mengupdate task";

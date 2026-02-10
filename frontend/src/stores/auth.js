@@ -1,13 +1,7 @@
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import api from '../lib/api';
 
-const API_URL = 'http://localhost:3000';
-
-// Setup axios defaults
-const token = localStorage.getItem('token');
-if (token) {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-}
+const API_URL = '';
 
 export const useAuthStore = defineStore('auth', {
   state: () => {
@@ -20,28 +14,44 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async register(data) {
       try {
-        const res = await axios.post(`${API_URL}/auth/register`, data);
+        const payload = {
+          name: (data?.name || '').trim(),
+          email: (data?.email || '').trim().toLowerCase(),
+          password: data?.password || '',
+        };
+        const res = await api.post(`${API_URL}/auth/register`, payload);
         this.token = res.data.access_token;
         this.user = res.data.user;
         localStorage.setItem('token', this.token);
         localStorage.setItem('user', JSON.stringify(this.user));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
         return res.data;
       } catch (error) {
-        throw error.response?.data?.message || error.message || 'Registrasi gagal';
+        const message =
+          error?.response?.data?.message ||
+          error?.message ||
+          'Registrasi gagal';
+        throw new Error(message);
       }
     },
     async login(email, password) {
       try {
-        const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+        const res = await api.post(`${API_URL}/auth/login`, {
+          email: (email || '').trim().toLowerCase(),
+          password: password || '',
+        });
         this.token = res.data.access_token;
         this.user = res.data.user;
         localStorage.setItem('token', this.token);
         localStorage.setItem('user', JSON.stringify(this.user));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
         return res.data;
       } catch (error) {
-        throw error.response?.data?.message || error.message || 'Login gagal';
+        const message =
+          error?.response?.data?.message ||
+          error?.message ||
+          'Login gagal';
+        throw new Error(message);
       }
     },
     logout() {
@@ -49,7 +59,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = null;
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      delete axios.defaults.headers.common['Authorization'];
+      delete api.defaults.headers.common['Authorization'];
     }
   }
 });

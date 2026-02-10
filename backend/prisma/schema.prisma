@@ -27,7 +27,11 @@ model User {
   friendOf  UserFriend[] @relation("FriendOf")
 
   // Fitur Grup
-  groups    Group[]  @relation("UserGroups")
+  groupMemberships GroupMember[]
+
+  // Chat
+  sentMessages     Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageRecipient")
 }
 
 model Group {
@@ -35,14 +39,17 @@ model Group {
   name      String
   createdAt DateTime @default(now())
 
-  // Relasi Many-to-Many ke User
-  members   User[]   @relation("UserGroups")
+  // Relasi ke GroupMember
+  members   GroupMember[]
   
   // Tugas khusus untuk grup
   tasks     Task[]
 
   // Jadwal grup
   schedules Schedule[]
+
+  // Chat
+  messages  Message[]
 }
 
 model Task {
@@ -93,4 +100,46 @@ model UserFriend {
   @@unique([userId, friendId])
   @@index([userId])
   @@index([friendId])
+}
+
+enum GroupRole {
+  ADMIN
+  MEMBER
+}
+
+model GroupMember {
+  id                String    @id @default(uuid())
+  userId            String
+  groupId           String
+  role              GroupRole @default(MEMBER)
+  canCreateSchedule Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  content     String
+  createdAt   DateTime @default(now())
+
+  senderId    String
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  // Group chat
+  groupId     String?
+  group       Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Direct message
+  recipientId String?
+  recipient   User?    @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([groupId])
+  @@index([recipientId])
 }

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="min-h-screen bg-[#F8F9FD] flex items-center justify-center p-6 font-sans">
     <div class="bg-white w-full max-w-[1000px] rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-100">
       
@@ -41,7 +41,7 @@
 
           <div class="group">
             <label class="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1 tracking-widest">Password</label>
-            <input v-model="password" type="password" :placeholder="isRegister ? 'Minimal 6 karakter' : '••••••••'" 
+            <input v-model="password" type="password" :placeholder="isRegister ? 'Minimal 6 karakter' : '********'" 
               class="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-[#FEEF6D] focus:bg-white rounded-[1.5rem] outline-none transition-all font-bold text-slate-700" 
               :minlength="isRegister ? 6 : undefined" required />
           </div>
@@ -87,9 +87,10 @@ const router = useRouter();
 const handleLogin = async () => {
   try {
     await authStore.login(email.value, password.value);
-    router.push('/');
+    router.push('/dashboard');
   } catch (error) {
-    alert('Login Gagal: ' + (error.response?.data?.message || 'Email atau password salah.'));
+    const message = error?.message || 'Email atau password salah.';
+    alert('Login Gagal: ' + message);
   }
 };
 
@@ -108,9 +109,12 @@ const handleRegister = async () => {
       email: email.value,
       password: password.value,
     });
-    router.push('/');
+    alert('Registrasi berhasil. Silakan login.');
+    router.push('/login');
   } catch (error) {
-    alert('Registrasi Gagal: ' + (error.response?.data?.message || 'Terjadi kesalahan.'));
+    const message = error?.message || 'Terjadi kesalahan.';
+    alert('Registrasi Gagal: ' + message);
   }
 };
 </script>
+

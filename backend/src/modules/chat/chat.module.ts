@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
-import { SocialController } from './social.controller';
+import { ChatGateway } from './chat.gateway';
+import { ChatService } from './chat.service';
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
+import { ChatController } from './chat.controller';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
@@ -12,7 +14,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
       signOptions: { expiresIn: '24h' },
     }),
   ],
-  controllers: [SocialController],
-  providers: [JwtAuthGuard],
+  providers: [ChatGateway, ChatService, JwtAuthGuard],
+  controllers: [ChatController],
 })
-export class SocialModule {}
+export class ChatModule {}

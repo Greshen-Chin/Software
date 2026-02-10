@@ -1,4 +1,4 @@
-import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, BadRequestException, HttpException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -13,7 +13,10 @@ export class AuthController {
     try {
       return await this.authService.register(body);
     } catch (error: any) {
-      throw new BadRequestException(error.message || 'Registrasi gagal');
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException(error?.message || 'Registrasi gagal');
     }
   }
 
@@ -25,7 +28,10 @@ export class AuthController {
     try {
       return await this.authService.login(body.email, body.password);
     } catch (error: any) {
-      throw new BadRequestException(error.message || 'Login gagal');
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException(error?.message || 'Login gagal');
     }
   }
 }

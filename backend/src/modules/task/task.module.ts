@@ -7,6 +7,7 @@ import { ITaskRepository } from './domain/task.repository.interface';
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtModule } from '@nestjs/jwt';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { JwtModule } from '@nestjs/jwt';
   providers: [
     CreateTaskUseCase,
     TaskReminderService,
+    JwtAuthGuard,
     {
       provide: 'ITaskRepository',
       useClass: PrismaTaskRepository,
