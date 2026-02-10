@@ -10,6 +10,18 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
+  private async generateUserCode(): Promise<string> {
+    for (let i = 0; i < 5; i++) {
+      const code = Math.random().toString(36).slice(2, 9).toUpperCase();
+      const exists = await this.prisma.user.findUnique({
+        where: { userCode: code },
+        select: { id: true },
+      });
+      if (!exists) return code;
+    }
+    throw new Error('Gagal membuat userCode unik');
+  }
+
   async register(data: { email: string; password: string; name: string }) {
     // Cek apakah email sudah terdaftar
     const existingUser = await this.prisma.user.findUnique({
@@ -29,6 +41,7 @@ export class AuthService {
         email: data.email,
         password: hashedPassword,
         name: data.name,
+        userCode: await this.generateUserCode(),
       },
     });
 
@@ -36,7 +49,7 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email };
     return {
       access_token: this.jwtService.sign(payload),
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, userCode: user.userCode, bio: user.bio },
     };
   }
 
@@ -53,7 +66,7 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email };
     return {
       access_token: this.jwtService.sign(payload),
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, userCode: user.userCode, bio: user.bio },
     };
   }
 }

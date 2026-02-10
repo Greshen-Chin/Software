@@ -14,24 +14,28 @@ export const useChatStore = defineStore('chat', {
   actions: {
     connect() {
       const socket = getSocket();
-      if (!this.listenersReady) {
+      const anySocket = socket as any;
+      if (!anySocket.__listenersAttached) {
         socket.on('connect', () => {
           this.connected = true;
         });
         socket.on('disconnect', () => {
           this.connected = false;
         });
-        socket.on('groupMessage', (msg) => {
-          if (msg.groupId === this.activeGroupId) {
+        socket.on('receive_message', (msg) => {
+          if (msg.groupId && msg.groupId === this.activeGroupId) {
             this.groupMessages.push(msg);
+            return;
+          }
+          if (msg.recipientId || msg.senderId) {
+            const otherId =
+              msg.senderId === this.activeDMUserId ? msg.senderId : msg.recipientId;
+            if (otherId === this.activeDMUserId) {
+              this.dmMessages.push(msg);
+            }
           }
         });
-        socket.on('dmMessage', (msg) => {
-          const otherId = msg.senderId === this.activeDMUserId ? msg.senderId : msg.recipientId;
-          if (otherId === this.activeDMUserId) {
-            this.dmMessages.push(msg);
-          }
-        });
+        anySocket.__listenersAttached = true;
         this.listenersReady = true;
       }
       if (!this.connected) {
@@ -61,12 +65,12 @@ export const useChatStore = defineStore('chat', {
     sendGroupMessage(content: string) {
       if (!this.activeGroupId) return;
       const socket = getSocket();
-      socket.emit('sendGroupMessage', { groupId: this.activeGroupId, content });
+      socket.emit('send_message', { type: 'group', groupId: this.activeGroupId, content });
     },
     sendDMMessage(content: string) {
       if (!this.activeDMUserId) return;
       const socket = getSocket();
-      socket.emit('sendDM', { recipientId: this.activeDMUserId, content });
+      socket.emit('send_message', { type: 'dm', recipientId: this.activeDMUserId, content });
     },
   },
 });

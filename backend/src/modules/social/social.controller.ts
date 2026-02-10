@@ -24,7 +24,7 @@ export class SocialController {
     }
     const friends = await this.prisma.userFriend.findMany({
       where: { userId: user.sub },
-      include: { friend: { select: { id: true, name: true, email: true } } },
+      include: { friend: { select: { id: true, name: true, userCode: true, bio: true } } },
     });
     return friends.map((f) => f.friend);
   }
@@ -37,13 +37,18 @@ export class SocialController {
     if (!email) {
       throw new BadRequestException('Email harus diisi');
     }
+    const friendIds = await this.prisma.userFriend.findMany({
+      where: { userId: user.sub },
+      select: { friendId: true },
+    });
+    const excludeIds = [user.sub, ...friendIds.map((f) => f.friendId)];
     const users = await this.prisma.user.findMany({
       where: {
         email: { contains: email, mode: 'insensitive' },
-        id: { not: user.sub }, // Exclude current user
+        id: { notIn: excludeIds },
       },
-      select: { id: true, name: true, email: true },
-      take: 10,
+      select: { id: true, name: true, userCode: true, bio: true },
+      take: 50,
     });
     return users;
   }
@@ -57,16 +62,21 @@ export class SocialController {
     if (!q) {
       throw new BadRequestException('Nama harus diisi');
     }
+    const friendIds = await this.prisma.userFriend.findMany({
+      where: { userId: user.sub },
+      select: { friendId: true },
+    });
+    const excludeIds = [user.sub, ...friendIds.map((f) => f.friendId)];
     const users = await this.prisma.user.findMany({
       where: {
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
+          { userCode: { contains: q, mode: 'insensitive' } },
         ],
-        id: { not: user.sub },
+        id: { notIn: excludeIds },
       },
-      select: { id: true, name: true, email: true },
-      take: 10,
+      select: { id: true, name: true, userCode: true, bio: true },
+      take: 50,
     });
     return users;
   }
@@ -81,47 +91,158 @@ export class SocialController {
     }
     const userFound = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, userCode: true, bio: true },
     });
     if (!userFound || userFound.id === user.sub) {
+      return [];
+    }
+    const alreadyFriend = await this.prisma.userFriend.findFirst({
+      where: { userId: user.sub, friendId: userFound.id },
+    });
+    if (alreadyFriend) {
       return [];
     }
     return [userFound];
   }
 
-  @Post('friends/add')
-  async addFriend(@Body('friendId') friendId: string, @CurrentUser() user: any) {
+  @Post('friends/request')
+  async requestFriend(
+    @Body('userCode') userCode: string,
+    @Body('friendId') friendId: string,
+    @CurrentUser() user: any,
+  ) {
     if (!user?.sub) {
       throw new BadRequestException('User tidak terautentikasi');
     }
-    if (!friendId) {
-      throw new BadRequestException('friendId harus diisi');
+    if (!userCode && !friendId) {
+      throw new BadRequestException('userCode atau friendId harus diisi');
     }
-    
-    if (user.sub === friendId) {
+    const code = userCode ? userCode.trim().toUpperCase() : '';
+    const target = code
+      ? await this.prisma.user.findFirst({ where: { userCode: { equals: code, mode: 'insensitive' } } })
+      : await this.prisma.user.findUnique({ where: { id: friendId } });
+    if (!target) {
+      throw new BadRequestException('User tidak ditemukan');
+    }
+    if (user.sub === target.id) {
       throw new BadRequestException('Tidak bisa menambah diri sendiri sebagai teman');
     }
 
-    // Check if friend exists
-    const friendExists = await this.prisma.user.findUnique({
-      where: { id: friendId },
+    const alreadyFriend = await this.prisma.userFriend.findFirst({
+      where: { userId: user.sub, friendId: target.id },
     });
-    if (!friendExists) {
-      throw new BadRequestException('User tidak ditemukan');
-    }
-
-    const existing = await this.prisma.userFriend.findFirst({
-      where: { userId: user.sub, friendId },
-    });
-
-    if (existing) {
+    if (alreadyFriend) {
       throw new BadRequestException('Sudah menjadi teman');
     }
 
-    return await this.prisma.userFriend.create({
-      data: { userId: user.sub, friendId },
-      include: { friend: { select: { id: true, name: true, email: true } } },
+    const reverseRequest = await this.prisma.friendRequest.findFirst({
+      where: {
+        senderId: target.id,
+        receiverId: user.sub,
+        status: 'PENDING',
+      },
     });
+    if (reverseRequest) {
+      await this.prisma.friendRequest.update({
+        where: { id: reverseRequest.id },
+        data: { status: 'ACCEPTED' },
+      });
+      await this.prisma.userFriend.upsert({
+        where: { userId_friendId: { userId: target.id, friendId: user.sub } },
+        update: {},
+        create: { userId: target.id, friendId: user.sub },
+      });
+      await this.prisma.userFriend.upsert({
+        where: { userId_friendId: { userId: user.sub, friendId: target.id } },
+        update: {},
+        create: { userId: user.sub, friendId: target.id },
+      });
+      return { ok: true, autoAccepted: true };
+    }
+
+    const existingRequest = await this.prisma.friendRequest.findFirst({
+      where: {
+        senderId: user.sub,
+        receiverId: target.id,
+        status: 'PENDING',
+      },
+    });
+    if (existingRequest) {
+      throw new BadRequestException('Permintaan sudah dikirim');
+    }
+
+    return await this.prisma.friendRequest.create({
+      data: { senderId: user.sub, receiverId: target.id },
+      include: {
+        receiver: { select: { id: true, name: true, userCode: true, bio: true } },
+      },
+    });
+  }
+
+  @Get('friends/requests')
+  async getFriendRequests(@CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    return await this.prisma.friendRequest.findMany({
+      where: { receiverId: user.sub, status: 'PENDING' },
+      include: { sender: { select: { id: true, name: true, userCode: true, bio: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  @Get('friends/requests/sent')
+  async getSentFriendRequests(@CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    return await this.prisma.friendRequest.findMany({
+      where: { senderId: user.sub, status: 'PENDING' },
+      include: { receiver: { select: { id: true, name: true, userCode: true, bio: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  @Post('friends/requests/:id/accept')
+  async acceptFriendRequest(@Param('id') id: string, @CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const request = await this.prisma.friendRequest.findUnique({ where: { id } });
+    if (!request || request.receiverId !== user.sub) {
+      throw new BadRequestException('Request tidak ditemukan');
+    }
+    await this.prisma.friendRequest.update({
+      where: { id },
+      data: { status: 'ACCEPTED' },
+    });
+    await this.prisma.userFriend.upsert({
+      where: { userId_friendId: { userId: request.senderId, friendId: request.receiverId } },
+      update: {},
+      create: { userId: request.senderId, friendId: request.receiverId },
+    });
+    await this.prisma.userFriend.upsert({
+      where: { userId_friendId: { userId: request.receiverId, friendId: request.senderId } },
+      update: {},
+      create: { userId: request.receiverId, friendId: request.senderId },
+    });
+    return { ok: true };
+  }
+
+  @Post('friends/requests/:id/reject')
+  async rejectFriendRequest(@Param('id') id: string, @CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const request = await this.prisma.friendRequest.findUnique({ where: { id } });
+    if (!request || request.receiverId !== user.sub) {
+      throw new BadRequestException('Request tidak ditemukan');
+    }
+    await this.prisma.friendRequest.update({
+      where: { id },
+      data: { status: 'REJECTED' },
+    });
+    return { ok: true };
   }
 
   @Delete('friends/:friendId')
@@ -131,6 +252,9 @@ export class SocialController {
     }
     await this.prisma.userFriend.deleteMany({
       where: { userId: user.sub, friendId },
+    });
+    await this.prisma.userFriend.deleteMany({
+      where: { userId: friendId, friendId: user.sub },
     });
     return { message: 'Friend removed' };
   }

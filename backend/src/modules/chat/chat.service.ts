@@ -50,7 +50,12 @@ export class ChatService {
 
   async areFriends(userId: string, otherUserId: string) {
     const friendship = await this.prisma.userFriend.findFirst({
-      where: { userId, friendId: otherUserId },
+      where: {
+        OR: [
+          { userId, friendId: otherUserId },
+          { userId: otherUserId, friendId: userId },
+        ],
+      },
     });
     return !!friendship;
   }

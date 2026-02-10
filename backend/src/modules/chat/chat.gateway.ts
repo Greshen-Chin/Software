@@ -5,13 +5,18 @@ import {
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
+import type { Server } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ChatService } from './chat.service';
 
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  private server: Server;
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly chatService: ChatService,
@@ -75,8 +80,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       userId,
       body.content.trim(),
     );
-    client.to(this.groupRoom(body.groupId)).emit('groupMessage', message);
-    client.emit('groupMessage', message);
+    this.server.to(this.groupRoom(body.groupId)).emit('receive_message', message);
   }
 
   @SubscribeMessage('sendDM')
@@ -94,8 +98,37 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       body.content.trim(),
     );
     const room = this.dmRoom(userId, body.recipientId);
-    client.to(room).emit('dmMessage', message);
-    client.emit('dmMessage', message);
+    this.server.to(room).emit('receive_message', message);
+  }
+
+  @SubscribeMessage('send_message')
+  async onSendMessage(
+    @MessageBody()
+    body: { type: 'dm' | 'group'; recipientId?: string; groupId?: string; content: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = client.data.userId as string | undefined;
+    if (!userId || !body?.content?.trim()) return;
+    if (body.type === 'group' && body.groupId) {
+      const member = await this.chatService.isGroupMember(body.groupId, userId);
+      if (!member) return;
+      const message = await this.chatService.createGroupMessage(
+        body.groupId,
+        userId,
+        body.content.trim(),
+      );
+      this.server.to(this.groupRoom(body.groupId)).emit('receive_message', message);
+    }
+    if (body.type === 'dm' && body.recipientId) {
+      const ok = await this.chatService.areFriends(userId, body.recipientId);
+      if (!ok) return;
+      const message = await this.chatService.createDirectMessage(
+        userId,
+        body.recipientId,
+        body.content.trim(),
+      );
+      this.server.to(this.dmRoom(userId, body.recipientId)).emit('receive_message', message);
+    }
   }
 
   private groupRoom(groupId: string) {

@@ -15,8 +15,6 @@ import {
   MessageCircle,
   Settings,
   LogOut,
-  UserPlus,
-  Users,
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 
@@ -35,11 +33,6 @@ const selectedGroupId = ref('');
 const canCreateSchedule = ref(false);
 const isSettingsOpen = ref(false);
 const isProfileOpen = ref(false);
-const isAddFriendOpen = ref(false);
-const friendQuery = ref('');
-const friendResults = ref([]);
-const friendWarning = ref('');
-const friendIdInput = ref('');
 
 const upcomingSchedules = computed(() => {
   return [...scheduleStore.schedules]
@@ -50,6 +43,16 @@ const upcomingSchedules = computed(() => {
 const urgentTasks = computed(() =>
   taskStore.tasks.filter(t => t.priority === 3 && t.status !== 'DONE').slice(0, 4),
 );
+
+const activeDMUser = computed(() => {
+  return socialStore.friends.find(f => f.id === chatStore.activeDMUserId);
+});
+
+const activeGroup = computed(() => {
+  return socialStore.groups.find(g => g.id === chatStore.activeGroupId);
+});
+
+const currentUserId = computed(() => authStore.user?.id);
 
 const openGroupChat = async (groupId) => {
   await chatStore.openGroup(groupId);
@@ -76,59 +79,6 @@ const handleLogout = () => {
   router.push('/login');
 };
 
-const searchFriends = async () => {
-  if (!friendQuery.value.trim()) {
-    friendResults.value = [];
-    friendWarning.value = '';
-    return;
-  }
-  const q = friendQuery.value.trim();
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
-  if (isUuid) {
-    friendWarning.value = '';
-    try {
-      friendResults.value = await socialStore.searchUsersById(q);
-    } catch (error) {
-      friendWarning.value = 'Gagal mencari user. Coba lagi.';
-      friendResults.value = [];
-    }
-    return;
-  }
-  if (
-    authStore.user?.name &&
-    q.toLowerCase() === authStore.user.name.toLowerCase()
-  ) {
-    friendResults.value = [];
-    friendWarning.value = 'Nama ini sama dengan nama kamu. Gunakan ID untuk menambah teman.';
-    return;
-  }
-  friendWarning.value = '';
-  try {
-    if (q.includes('@')) {
-      friendResults.value = await socialStore.searchUsersByEmail(q);
-    } else {
-      friendResults.value = await socialStore.searchUsersByName(q);
-    }
-  } catch (error) {
-    friendWarning.value = 'Gagal mencari user. Coba lagi.';
-    friendResults.value = [];
-  }
-};
-
-const addFriendById = async (friendId) => {
-  if (!friendId) return;
-  if (authStore.user?.id && friendId === authStore.user.id) {
-    alert('Tidak bisa menambah diri sendiri sebagai teman.');
-    return;
-  }
-  await socialStore.addFriend(friendId);
-  await socialStore.fetchFriends();
-  friendQuery.value = '';
-  friendResults.value = [];
-  friendIdInput.value = '';
-  friendWarning.value = '';
-  isAddFriendOpen.value = false;
-};
 
 const searchMembers = async () => {
   if (!memberEmail.value.trim()) {
@@ -154,6 +104,11 @@ onMounted(async () => {
     socialStore.fetchFriends(),
   ]);
   chatStore.connect();
+  if (chatStore.activeDMUserId) {
+    activeChatTab.value = 'dm';
+  } else if (chatStore.activeGroupId) {
+    activeChatTab.value = 'group';
+  }
 });
 </script>
 
@@ -173,8 +128,8 @@ onMounted(async () => {
         >
           <p class="text-sm font-bold text-slate-800">{{ authStore.user?.name || 'User' }}</p>
           <p class="text-xs text-slate-500 mt-1">{{ authStore.user?.email || '' }}</p>
-          <p class="text-[11px] text-slate-400 mt-2">ID: {{ authStore.user?.id || '-' }}</p>
-          <p class="text-[10px] text-slate-400 mt-1">Gunakan ID untuk tambah teman/DM.</p>
+          <p class="text-[11px] text-slate-400 mt-2">Code: {{ authStore.user?.userCode || '-' }}</p>
+          <p class="text-[10px] text-slate-400 mt-1">Gunakan Code untuk tambah teman/DM.</p>
           <div class="mt-4 space-y-2">
             <button
               @click="isSettingsOpen = true; isProfileOpen = false"
@@ -198,13 +153,9 @@ onMounted(async () => {
         <router-link to="/calendar">
           <CalendarIcon class="w-6 h-6 cursor-pointer hover:text-black transition" />
         </router-link>
-        <button
-          @click="isAddFriendOpen = true"
-          class="w-6 h-6 flex items-center justify-center text-slate-700 hover:text-black transition"
-          title="Tambah Teman"
-        >
-          <UserPlus class="w-6 h-6" />
-        </button>
+        <router-link to="/friends">
+          <MessageCircle class="w-6 h-6 cursor-pointer hover:text-black transition" />
+        </router-link>
       </nav>
     </aside>
 
@@ -278,6 +229,17 @@ onMounted(async () => {
               <h3 class="text-lg font-bold flex items-center gap-2">
                 <MessageCircle class="w-5 h-5 text-emerald-400" /> Live Chat
               </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                <span v-if="activeChatTab === 'dm' && activeDMUser">
+                  DM dengan {{ activeDMUser.name }}
+                </span>
+                <span v-else-if="activeChatTab === 'group' && activeGroup">
+                  Grup: {{ activeGroup.name }}
+                </span>
+                <span v-else>
+                  Pilih teman atau grup untuk memulai chat.
+                </span>
+              </p>
               <div class="mt-4 bg-white/10 rounded-2xl p-4 h-72 flex flex-col">
                 <div class="flex gap-3 text-xs font-bold text-slate-300 mb-3">
                   <button
@@ -305,13 +267,21 @@ onMounted(async () => {
                   <div
                     v-for="msg in (activeChatTab === 'group' ? chatStore.groupMessages : chatStore.dmMessages)"
                     :key="msg.id"
-                    class="bg-black/30 rounded-xl p-3"
+                    class="flex"
+                    :class="msg.senderId === currentUserId ? 'justify-end' : 'justify-start'"
                   >
-                    <p class="text-xs text-emerald-300 font-bold">{{ msg.sender?.name || 'User' }}</p>
-                    <p class="text-sm text-white mt-1">{{ msg.content }}</p>
-                    <p class="text-[10px] text-slate-400 mt-1">
-                      {{ new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }}
-                    </p>
+                    <div
+                      class="max-w-[70%] rounded-2xl px-4 py-3"
+                      :class="msg.senderId === currentUserId ? 'bg-emerald-500 text-white' : 'bg-black/30 text-white'"
+                    >
+                      <p class="text-xs font-bold mb-1">
+                        {{ msg.senderId === currentUserId ? 'Kamu' : (msg.sender?.name || 'User') }}
+                      </p>
+                      <p class="text-sm">{{ msg.content }}</p>
+                      <p class="text-[10px] mt-2 opacity-70 text-right">
+                        {{ new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }}
+                      </p>
+                    </div>
                   </div>
                 </div>
                 <div class="mt-3 flex gap-2">
@@ -333,7 +303,7 @@ onMounted(async () => {
 
             <div class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm">
               <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Users class="w-5 h-5 text-indigo-500" /> Grup & Akses
+                <MessageCircle class="w-5 h-5 text-indigo-500" /> Grup & Akses
               </h3>
               <div class="mt-4 space-y-4">
                 <select
@@ -421,7 +391,7 @@ onMounted(async () => {
                 class="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-sm font-bold text-slate-700"
               >
                 <span>{{ f.name }}</span>
-                <span class="text-[10px] text-slate-400">{{ f.email }}</span>
+                <span class="text-[10px] text-slate-400">Code: {{ f.userCode }}</span>
               </button>
             </div>
           </div>
@@ -464,67 +434,6 @@ onMounted(async () => {
     </div>
   </div>
 
-  <div
-    v-if="isAddFriendOpen"
-    class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-    @click.self="isAddFriendOpen = false"
-  >
-    <div class="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl">
-      <h2 class="text-2xl font-black text-slate-800 mb-6">Tambah Teman</h2>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-xs font-bold uppercase text-slate-400 mb-2">Cari Nama</label>
-      <input
-        v-model="friendQuery"
-        type="text"
-        placeholder="Cari nama teman"
-        class="w-full border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none"
-        @input="searchFriends"
-      />
-          <p v-if="friendWarning" class="text-xs text-amber-600 mt-2">{{ friendWarning }}</p>
-        </div>
-        <div>
-          <label class="block text-xs font-bold uppercase text-slate-400 mb-2">Tambah via ID</label>
-          <div class="flex gap-2">
-            <input
-              v-model="friendIdInput"
-              type="text"
-              placeholder="Masukkan ID teman"
-              class="flex-1 border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none"
-            />
-            <button
-              @click="addFriendById(friendIdInput.trim())"
-              class="px-4 py-3 rounded-2xl bg-black text-white font-bold hover:bg-slate-800"
-            >
-              Tambah
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="mt-4 space-y-2 max-h-48 overflow-y-auto">
-        <button
-          v-for="u in friendResults"
-          :key="u.id"
-          @click="addFriendById(u.id)"
-          class="w-full text-left px-4 py-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-sm font-bold text-slate-700"
-        >
-          {{ u.name }} · {{ u.email }}
-          <div class="text-[10px] text-slate-400 mt-1">ID: {{ u.id }}</div>
-        </button>
-        <p v-if="friendQuery && friendResults.length === 0" class="text-xs text-slate-400">
-          Tidak ada user ditemukan.
-        </p>
-      </div>
-      <div class="mt-6 flex justify-end">
-        <button
-          @click="isAddFriendOpen = false"
-          class="px-6 py-3 rounded-2xl bg-black text-white font-bold hover:bg-slate-800"
-        >
-          Tutup
-        </button>
-      </div>
-    </div>
-  </div>
 </template>
 
 

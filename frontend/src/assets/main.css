@@ -9,3 +9,35 @@
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
+
+body.theme-dark {
+  background-color: #0f0f12;
+  color: #e5e7eb;
+}
+
+body.theme-dark .bg-white {
+  background-color: #15151a !important;
+}
+
+body.theme-dark .text-slate-900 {
+  color: #f3f4f6 !important;
+}
+
+body.theme-dark .text-slate-800 {
+  color: #e5e7eb !important;
+}
+
+body.theme-dark .text-slate-700,
+body.theme-dark .text-slate-600,
+body.theme-dark .text-slate-500,
+body.theme-dark .text-slate-400 {
+  color: #cbd5f5 !important;
+}
+
+body.theme-dark .border-slate-100 {
+  border-color: #262630 !important;
+}
+
+body.theme-dark .bg-slate-100 {
+  background-color: #1f1f27 !important;
+}

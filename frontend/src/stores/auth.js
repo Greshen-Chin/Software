@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import api from '../lib/api';
+import { resetSocket } from '../lib/socket';
 
 const API_URL = '';
 
@@ -25,6 +26,7 @@ export const useAuthStore = defineStore('auth', {
         localStorage.setItem('token', this.token);
         localStorage.setItem('user', JSON.stringify(this.user));
         api.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
+        resetSocket();
         return res.data;
       } catch (error) {
         const message =
@@ -45,6 +47,7 @@ export const useAuthStore = defineStore('auth', {
         localStorage.setItem('token', this.token);
         localStorage.setItem('user', JSON.stringify(this.user));
         api.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
+        resetSocket();
         return res.data;
       } catch (error) {
         const message =
@@ -60,6 +63,7 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       delete api.defaults.headers.common['Authorization'];
+      resetSocket();
     }
   }
 });

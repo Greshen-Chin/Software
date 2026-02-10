@@ -27,8 +27,32 @@ export const useSocialStore = defineStore('social', {
       const res = await api.post('/social/friends/search-id', { id });
       return res.data || [];
     },
-    async addFriend(friendId: string) {
-      const res = await api.post('/social/friends/add', { friendId });
+    async requestFriendByCode(userCode: string) {
+      const res = await api.post('/social/friends/request', { userCode });
+      return res.data;
+    },
+    async requestFriendById(friendId: string) {
+      const res = await api.post('/social/friends/request', { friendId });
+      return res.data;
+    },
+    async getFriendRequests() {
+      const res = await api.get('/social/friends/requests');
+      return res.data || [];
+    },
+    async getSentFriendRequests() {
+      const res = await api.get('/social/friends/requests/sent');
+      return res.data || [];
+    },
+    async acceptFriendRequest(requestId: string) {
+      const res = await api.post(`/social/friends/requests/${requestId}/accept`);
+      return res.data;
+    },
+    async rejectFriendRequest(requestId: string) {
+      const res = await api.post(`/social/friends/requests/${requestId}/reject`);
+      return res.data;
+    },
+    async createGroup(name: string) {
+      const res = await api.post('/social/groups', { name });
       return res.data;
     },
     async addGroupMember(groupId: string, userId: string, canCreateSchedule: boolean) {

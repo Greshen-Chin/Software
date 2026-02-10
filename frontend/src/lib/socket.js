@@ -15,3 +15,10 @@ export function getSocket() {
   }
   return socket;
 }
+
+export function resetSocket() {
+  if (socket) {
+    socket.disconnect();
+    socket = undefined;
+  }
+}

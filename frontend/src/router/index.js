@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import Dashboard from '../views/Dashboard.vue';
 import Calendar from '../views/Calendar.vue';
 import Auth from '../views/Auth.vue';
+import Friends from '../views/Friends.vue';
 
 const routes = [
   {
@@ -18,6 +19,12 @@ const routes = [
     path: '/calendar', 
     name: 'Calendar',
     component: Calendar,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/friends',
+    name: 'Friends',
+    component: Friends,
     meta: { requiresAuth: true }
   },
   { 
