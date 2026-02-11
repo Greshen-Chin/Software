@@ -18,12 +18,17 @@ export class CreateTaskUseCase {
       throw new BadRequestException("Deadline tidak boleh di masa lalu!");
     }
 
+    const startDate = data.startDate ? new Date(data.startDate) : new Date();
+
     const newTask = new Task(
       Math.random().toString(36).substr(2, 9), // Simple ID generator
       data.title,
+      startDate,
       new Date(data.deadline),
       data.priority,
-      TaskStatus.TODO
+      typeof data.progress === 'number' ? data.progress : 0,
+      TaskStatus.TODO,
+      new Date()
     );
 
     await this.taskRepo.save(newTask, userId);

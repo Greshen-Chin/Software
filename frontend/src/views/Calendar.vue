@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref } from 'vue';
 import WeeklyCalendar from '../components/WeeklyCalendar.vue';
 import { LayoutDashboard, Calendar as CalendarIcon, Settings, LogOut, MessageCircle } from 'lucide-vue-next';
@@ -9,7 +9,6 @@ const authStore = useAuthStore();
 const router = useRouter();
 
 const isProfileOpen = ref(false);
-const isSettingsOpen = ref(false);
 
 const handleLogout = () => {
   authStore.logout();
@@ -18,14 +17,20 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen bg-[#F8F9FD]">
+  <div class="flex min-h-screen app-shell">
     <aside class="w-20 bg-[#FEEF6D] flex flex-col items-center py-8 gap-8 border-r border-black/5 hidden md:flex">
       <div class="relative">
         <button
           @click="isProfileOpen = !isProfileOpen"
-          class="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg"
+          class="w-12 h-12 rounded-2xl overflow-hidden bg-black flex items-center justify-center text-white font-bold text-xl shadow-lg"
         >
-          {{ (authStore.user?.name || 'M')[0]?.toUpperCase() }}
+          <img
+            v-if="authStore.user?.avatarUrl && authStore.user.avatarUrl.startsWith('http')"
+            :src="authStore.user.avatarUrl"
+            alt="avatar"
+            class="w-full h-full object-cover"
+          />
+          <span v-else>{{ (authStore.user?.name || 'M')[0]?.toUpperCase() }}</span>
         </button>
         <div
           v-if="isProfileOpen"
@@ -37,7 +42,7 @@ const handleLogout = () => {
           <p class="text-[10px] text-slate-400 mt-1">Gunakan Code untuk tambah teman/DM.</p>
           <div class="mt-4 space-y-2">
             <button
-              @click="isSettingsOpen = true; isProfileOpen = false"
+              @click="router.push('/settings'); isProfileOpen = false"
               class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-sm font-bold text-slate-700"
             >
               <Settings class="w-4 h-4" /> Pengaturan
@@ -69,36 +74,7 @@ const handleLogout = () => {
     </main>
   </div>
 
-  <div
-    v-if="isSettingsOpen"
-    class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-    @click.self="isSettingsOpen = false"
-  >
-    <div class="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl">
-      <h2 class="text-2xl font-black text-slate-800 mb-6">Pengaturan</h2>
-      <div class="space-y-4 text-sm text-slate-600">
-        <div class="flex items-center justify-between">
-          <span>Notifikasi</span>
-          <span class="text-xs font-bold text-slate-400">Aktif</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span>Mode Fokus</span>
-          <span class="text-xs font-bold text-slate-400">Nonaktif</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span>Sinkronisasi</span>
-          <span class="text-xs font-bold text-slate-400">Tersambung</span>
-        </div>
-      </div>
-      <div class="mt-8 flex justify-end">
-        <button
-          @click="isSettingsOpen = false"
-          class="px-6 py-3 rounded-2xl bg-black text-white font-bold hover:bg-slate-800"
-        >
-          Tutup
-        </button>
-      </div>
-    </div>
-  </div>
+  
 
 </template>
+

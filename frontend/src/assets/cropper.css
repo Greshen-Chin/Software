@@ -1,0 +1,119 @@
+/* Minimal CropperJS styles for avatar cropping */
+.cropper-container {
+  position: relative;
+  overflow: hidden;
+  direction: ltr;
+  touch-action: none;
+  user-select: none;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.cropper-container img {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+  max-width: none;
+}
+
+.cropper-wrap-box,
+.cropper-canvas,
+.cropper-drag-box,
+.cropper-crop-box,
+.cropper-modal {
+  position: absolute;
+  inset: 0;
+}
+
+.cropper-modal {
+  background-color: rgba(0, 0, 0, 0.45);
+}
+
+.cropper-view-box {
+  display: block;
+  height: 100%;
+  width: 100%;
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: -2px;
+  border-radius: 50%;
+}
+
+.cropper-crop-box {
+  border-radius: 50%;
+}
+
+.cropper-face {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.cropper-line,
+.cropper-point {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.cropper-line {
+  position: absolute;
+  display: block;
+}
+
+.cropper-line.line-e,
+.cropper-line.line-w {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.cropper-line.line-n,
+.cropper-line.line-s {
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
+.cropper-point {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.cropper-point.point-n {
+  top: -5px;
+  left: 50%;
+  margin-left: -5px;
+}
+.cropper-point.point-s {
+  bottom: -5px;
+  left: 50%;
+  margin-left: -5px;
+}
+.cropper-point.point-e {
+  right: -5px;
+  top: 50%;
+  margin-top: -5px;
+}
+.cropper-point.point-w {
+  left: -5px;
+  top: 50%;
+  margin-top: -5px;
+}
+.cropper-point.point-ne {
+  right: -5px;
+  top: -5px;
+}
+.cropper-point.point-nw {
+  left: -5px;
+  top: -5px;
+}
+.cropper-point.point-se {
+  right: -5px;
+  bottom: -5px;
+}
+.cropper-point.point-sw {
+  left: -5px;
+  bottom: -5px;
+}

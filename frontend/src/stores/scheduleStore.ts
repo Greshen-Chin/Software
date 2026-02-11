@@ -37,6 +37,16 @@ export const useScheduleStore = defineStore('schedule', {
         throw new Error(errorMsg);
       }
     },
+    async updateSchedule(id: string, schedule: any) {
+      try {
+        const res = await api.patch(`${API_URL}/${id}`, schedule);
+        await this.fetchSchedules();
+        return res.data;
+      } catch (e: any) {
+        const errorMsg = e.response?.data?.message || 'Gagal mengubah jadwal';
+        throw new Error(errorMsg);
+      }
+    },
     async deleteSchedule(id: string) {
       try {
         await api.delete(`${API_URL}/${id}`);

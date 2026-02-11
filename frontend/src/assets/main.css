@@ -41,3 +41,127 @@ body.theme-dark .border-slate-100 {
 body.theme-dark .bg-slate-100 {
   background-color: #1f1f27 !important;
 }
+/* Theme variables */
+:root {
+  --bg-primary: #f4f5fb;
+  --bg-secondary: #ffffff;
+  --text-primary: #121826;
+  --text-secondary: #6b7280;
+  --card-bg: #ffffff;
+  --border-color: #eef0f6;
+  --shadow-soft: 0 18px 40px rgba(17, 24, 39, 0.08);
+}
+
+.theme-dark {
+  --bg-primary: #12131a;
+  --bg-secondary: #1b1d27;
+  --text-primary: #f4f6fb;
+  --text-secondary: #c2c8d6;
+  --card-bg: #1b1d27;
+  --border-color: #2a2f3d;
+  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.4);
+}
+
+.theme-dark .bg-white {
+  background-color: var(--card-bg) !important;
+}
+
+.theme-dark .border-slate-100,
+.theme-dark .border-slate-200 {
+  border-color: var(--border-color) !important;
+}
+
+.theme-dark .text-slate-900,
+.theme-dark .text-slate-800,
+.theme-dark .text-slate-700,
+.theme-dark .text-slate-600 {
+  color: var(--text-primary) !important;
+}
+
+.theme-dark .text-slate-500,
+.theme-dark .text-slate-400 {
+  color: var(--text-secondary) !important;
+}
+
+.theme-dark .bg-slate-50,
+.theme-dark .bg-slate-100 {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.theme-dark option {
+  background-color: #1b1d27;
+  color: #f4f6fb;
+}
+
+.app-shell {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.card-soft {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-soft);
+}
+
+.muted-text {
+  color: var(--text-secondary);
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.chip-soft {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border-color);
+}
+
+.theme-dark .chip-soft {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.input-soft {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.theme-dark .input-soft::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.chat-surface {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-soft);
+}
+
+.chat-bubble-in {
+  background: rgba(148, 163, 184, 0.25);
+  color: var(--text-primary);
+}
+
+.theme-dark .chat-bubble-in {
+  background: #2a2f3d;
+  color: #e5e7eb;
+}
+
+.chat-bubble-out {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.chat-input {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}

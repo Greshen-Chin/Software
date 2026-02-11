@@ -44,6 +44,24 @@ export const useTaskStore = defineStore('task', {
         const errorMsg = err.response?.data?.message || "Gagal mengupdate task";
         throw new Error(errorMsg);
       }
+    },
+    async updateProgress(id: string, progress: number) {
+      try {
+        await api.patch(`${API_URL}/${id}/progress`, { progress });
+        await this.fetchTasks();
+      } catch (err: any) {
+        const errorMsg = err.response?.data?.message || "Gagal mengupdate progress";
+        throw new Error(errorMsg);
+      }
+    },
+    async deleteTask(id: string) {
+      try {
+        await api.delete(`${API_URL}/${id}`);
+        await this.fetchTasks();
+      } catch (err: any) {
+        const errorMsg = err.response?.data?.message || "Gagal menghapus task";
+        throw new Error(errorMsg);
+      }
     }
   }
 });

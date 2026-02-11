@@ -64,6 +64,32 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('user');
       delete api.defaults.headers.common['Authorization'];
       resetSocket();
-    }
+    },
+    async refreshProfile() {
+      try {
+        const res = await api.get('/users/me');
+        this.user = res.data;
+        localStorage.setItem('user', JSON.stringify(this.user));
+        return res.data;
+      } catch (error) {
+        return null;
+      }
+    },
+    async updateProfile(payload) {
+      const res = await api.patch('/users/me', payload);
+      this.user = res.data;
+      localStorage.setItem('user', JSON.stringify(this.user));
+      return res.data;
+    },
+    async uploadAvatar(file) {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await api.post('/users/me/avatar', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      this.user = res.data;
+      localStorage.setItem('user', JSON.stringify(this.user));
+      return res.data;
+    },
   }
 });

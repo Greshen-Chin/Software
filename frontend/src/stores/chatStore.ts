@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import api from '../lib/api';
 import { getSocket } from '../lib/socket';
+import { useAuthStore } from './auth';
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -27,10 +28,14 @@ export const useChatStore = defineStore('chat', {
             this.groupMessages.push(msg);
             return;
           }
-          if (msg.recipientId || msg.senderId) {
-            const otherId =
-              msg.senderId === this.activeDMUserId ? msg.senderId : msg.recipientId;
-            if (otherId === this.activeDMUserId) {
+          if (msg.recipientId && msg.senderId && this.activeDMUserId) {
+            const authStore = useAuthStore();
+            const currentUserId = authStore.user?.id;
+            if (!currentUserId) return;
+            const isForThisDm =
+              (msg.senderId === this.activeDMUserId && msg.recipientId === currentUserId) ||
+              (msg.senderId === currentUserId && msg.recipientId === this.activeDMUserId);
+            if (isForThisDm) {
               this.dmMessages.push(msg);
             }
           }

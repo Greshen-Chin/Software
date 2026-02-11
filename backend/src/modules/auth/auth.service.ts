@@ -49,7 +49,7 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email };
     return {
       access_token: this.jwtService.sign(payload),
-      user: { id: user.id, name: user.name, email: user.email, userCode: user.userCode, bio: user.bio },
+      user: { id: user.id, name: user.name, email: user.email, userCode: user.userCode, bio: user.bio, avatarUrl: user.avatarUrl },
     };
   }
 
@@ -66,7 +66,7 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email };
     return {
       access_token: this.jwtService.sign(payload),
-      user: { id: user.id, name: user.name, email: user.email, userCode: user.userCode, bio: user.bio },
+      user: { id: user.id, name: user.name, email: user.email, userCode: user.userCode, bio: user.bio, avatarUrl: user.avatarUrl },
     };
   }
 }

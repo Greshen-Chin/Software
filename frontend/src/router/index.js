@@ -3,6 +3,7 @@ import Dashboard from '../views/Dashboard.vue';
 import Calendar from '../views/Calendar.vue';
 import Auth from '../views/Auth.vue';
 import Friends from '../views/Friends.vue';
+import Settings from '../views/Settings.vue';
 
 const routes = [
   {
@@ -25,6 +26,12 @@ const routes = [
     path: '/friends',
     name: 'Friends',
     component: Friends,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
     meta: { requiresAuth: true }
   },
   { 

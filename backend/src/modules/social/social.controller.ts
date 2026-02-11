@@ -3,10 +3,13 @@ import {
   Get,
   Post,
   Delete,
+  Patch,
   Body,
   Param,
+  Query,
   UseGuards,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -24,7 +27,7 @@ export class SocialController {
     }
     const friends = await this.prisma.userFriend.findMany({
       where: { userId: user.sub },
-      include: { friend: { select: { id: true, name: true, userCode: true, bio: true } } },
+      include: { friend: { select: { id: true, name: true, userCode: true, bio: true, avatarUrl: true } } },
     });
     return friends.map((f) => f.friend);
   }
@@ -47,7 +50,7 @@ export class SocialController {
         email: { contains: email, mode: 'insensitive' },
         id: { notIn: excludeIds },
       },
-      select: { id: true, name: true, userCode: true, bio: true },
+      select: { id: true, name: true, userCode: true, bio: true, avatarUrl: true },
       take: 50,
     });
     return users;
@@ -75,7 +78,7 @@ export class SocialController {
         ],
         id: { notIn: excludeIds },
       },
-      select: { id: true, name: true, userCode: true, bio: true },
+      select: { id: true, name: true, userCode: true, bio: true, avatarUrl: true },
       take: 50,
     });
     return users;
@@ -91,7 +94,7 @@ export class SocialController {
     }
     const userFound = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, name: true, userCode: true, bio: true },
+      select: { id: true, name: true, userCode: true, bio: true, avatarUrl: true },
     });
     if (!userFound || userFound.id === user.sub) {
       return [];
@@ -174,7 +177,7 @@ export class SocialController {
     return await this.prisma.friendRequest.create({
       data: { senderId: user.sub, receiverId: target.id },
       include: {
-        receiver: { select: { id: true, name: true, userCode: true, bio: true } },
+        receiver: { select: { id: true, name: true, userCode: true, bio: true, avatarUrl: true } },
       },
     });
   }
@@ -186,7 +189,7 @@ export class SocialController {
     }
     return await this.prisma.friendRequest.findMany({
       where: { receiverId: user.sub, status: 'PENDING' },
-      include: { sender: { select: { id: true, name: true, userCode: true, bio: true } } },
+      include: { sender: { select: { id: true, name: true, userCode: true, bio: true, avatarUrl: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -198,7 +201,7 @@ export class SocialController {
     }
     return await this.prisma.friendRequest.findMany({
       where: { senderId: user.sub, status: 'PENDING' },
-      include: { receiver: { select: { id: true, name: true, userCode: true, bio: true } } },
+      include: { receiver: { select: { id: true, name: true, userCode: true, bio: true, avatarUrl: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -268,7 +271,7 @@ export class SocialController {
       where: { members: { some: { userId: user.sub } } },
       include: {
         members: {
-          include: { user: { select: { id: true, name: true, email: true } } },
+          include: { user: { select: { id: true, name: true, email: true, avatarUrl: true, bio: true } } },
         },
       },
     });
@@ -280,6 +283,8 @@ export class SocialController {
         id: m.user.id,
         name: m.user.name,
         email: m.user.email,
+        avatarUrl: m.user.avatarUrl,
+        bio: m.user.bio,
         role: m.role,
         canCreateSchedule: m.canCreateSchedule,
       })),
@@ -339,11 +344,11 @@ export class SocialController {
 
     // Verify group exists and current user is admin
     const adminMember = await this.prisma.groupMember.findFirst({
-      where: { groupId, userId: user.sub, role: 'ADMIN' },
+      where: { groupId, userId: user.sub },
     });
 
-    if (!adminMember) {
-      throw new BadRequestException('Hanya admin yang bisa menambah anggota');
+    if (!adminMember || (adminMember.role !== 'ADMIN' && adminMember.role !== 'MODERATOR')) {
+      throw new ForbiddenException('Tidak memiliki akses menambah anggota');
     }
 
     // Ensure target user exists
@@ -391,5 +396,290 @@ export class SocialController {
         canCreateSchedule: m.canCreateSchedule,
       })),
     };
+  }
+
+  @Post('groups/:groupId/invites')
+  async inviteToGroup(
+    @Param('groupId') groupId: string,
+    @Body('userId') inviteeId: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    if (!inviteeId) {
+      throw new BadRequestException('userId harus diisi');
+    }
+
+    const adminMember = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: user.sub },
+    });
+    if (!adminMember || adminMember.role !== 'ADMIN') {
+      throw new ForbiddenException('Hanya admin yang bisa mengundang');
+    }
+
+    const isFriend = await this.prisma.userFriend.findFirst({
+      where: { userId: user.sub, friendId: inviteeId },
+    });
+    if (!isFriend) {
+      throw new BadRequestException('Hanya bisa mengundang teman');
+    }
+
+    const alreadyMember = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: inviteeId },
+    });
+    if (alreadyMember) {
+      throw new BadRequestException('User sudah menjadi anggota grup');
+    }
+
+    const invite = await this.prisma.groupInvite.upsert({
+      where: { groupId_inviteeId: { groupId, inviteeId } },
+      update: { status: 'PENDING', inviterId: user.sub },
+      create: { groupId, inviteeId, inviterId: user.sub },
+      include: {
+        group: { select: { id: true, name: true } },
+        inviter: { select: { id: true, name: true } },
+        invitee: { select: { id: true, name: true } },
+      },
+    });
+
+    return invite;
+  }
+
+  @Get('groups/invites')
+  async getGroupInvites(@CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    return await this.prisma.groupInvite.findMany({
+      where: { inviteeId: user.sub, status: 'PENDING' },
+      include: {
+        group: { select: { id: true, name: true } },
+        inviter: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  @Post('groups/invites/:id/accept')
+  async acceptGroupInvite(@Param('id') id: string, @CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const invite = await this.prisma.groupInvite.findUnique({ where: { id } });
+    if (!invite || invite.inviteeId !== user.sub) {
+      throw new BadRequestException('Invite tidak ditemukan');
+    }
+
+    await this.prisma.groupInvite.update({
+      where: { id },
+      data: { status: 'ACCEPTED' },
+    });
+
+    await this.prisma.groupMember.upsert({
+      where: { userId_groupId: { userId: user.sub, groupId: invite.groupId } },
+      update: {},
+      create: {
+        userId: user.sub,
+        groupId: invite.groupId,
+        role: 'MEMBER',
+        canCreateSchedule: false,
+      },
+    });
+
+    return { ok: true };
+  }
+
+  @Post('groups/invites/:id/reject')
+  async rejectGroupInvite(@Param('id') id: string, @CurrentUser() user: any) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const invite = await this.prisma.groupInvite.findUnique({ where: { id } });
+    if (!invite || invite.inviteeId !== user.sub) {
+      throw new BadRequestException('Invite tidak ditemukan');
+    }
+    await this.prisma.groupInvite.update({
+      where: { id },
+      data: { status: 'REJECTED' },
+    });
+    return { ok: true };
+  }
+
+  @Get('users/:id/profile')
+  async getUserProfile(
+    @Param('id') targetId: string,
+    @CurrentUser() user: any,
+    @Query('groupId') groupId?: string,
+  ) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetId },
+      select: { id: true, name: true, bio: true, avatarUrl: true, createdAt: true },
+    });
+    if (!target) {
+      throw new BadRequestException('User tidak ditemukan');
+    }
+
+    const isFriend = await this.prisma.userFriend.findFirst({
+      where: { userId: user.sub, friendId: targetId },
+    });
+    const pendingSent = await this.prisma.friendRequest.findFirst({
+      where: { senderId: user.sub, receiverId: targetId, status: 'PENDING' },
+    });
+    const pendingReceived = await this.prisma.friendRequest.findFirst({
+      where: { senderId: targetId, receiverId: user.sub, status: 'PENDING' },
+    });
+
+    let relationship = 'NONE';
+    if (isFriend) relationship = 'FRIEND';
+    else if (pendingSent) relationship = 'PENDING_SENT';
+    else if (pendingReceived) relationship = 'PENDING_RECEIVED';
+
+    let groupInfo = null as any;
+    if (groupId) {
+      const member = await this.prisma.groupMember.findFirst({
+        where: { groupId, userId: targetId },
+      });
+      if (member) {
+        groupInfo = {
+          role: member.role,
+          joinedAt: member.createdAt,
+        };
+      }
+    }
+
+    return {
+      user: target,
+      relationship,
+      groupInfo,
+      blocked: false,
+    };
+  }
+
+  @Patch('groups/:groupId')
+  async updateGroupName(
+    @Param('groupId') groupId: string,
+    @Body('name') name: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    if (!name) {
+      throw new BadRequestException('Nama grup harus diisi');
+    }
+    const member = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: user.sub },
+    });
+    if (!member || (member.role !== 'ADMIN' && member.role !== 'MODERATOR')) {
+      throw new ForbiddenException('Tidak memiliki akses');
+    }
+    return await this.prisma.group.update({
+      where: { id: groupId },
+      data: { name },
+    });
+  }
+
+  @Post('groups/:groupId/members/:memberId/remove')
+  async removeGroupMember(
+    @Param('groupId') groupId: string,
+    @Param('memberId') memberId: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const member = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: user.sub },
+    });
+    if (!member || member.role !== 'ADMIN') {
+      throw new ForbiddenException('Hanya admin yang bisa menghapus anggota');
+    }
+    await this.prisma.groupMember.deleteMany({
+      where: { groupId, userId: memberId },
+    });
+    return { ok: true };
+  }
+
+  @Post('groups/:groupId/members/:memberId/promote')
+  async promoteToModerator(
+    @Param('groupId') groupId: string,
+    @Param('memberId') memberId: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const member = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: user.sub },
+    });
+    if (!member || member.role !== 'ADMIN') {
+      throw new ForbiddenException('Hanya admin yang bisa promote');
+    }
+    await this.prisma.groupMember.updateMany({
+      where: { groupId, userId: memberId },
+      data: { role: 'MODERATOR' },
+    });
+    return { ok: true };
+  }
+
+  @Post('groups/:groupId/members/:memberId/demote')
+  async demoteToMember(
+    @Param('groupId') groupId: string,
+    @Param('memberId') memberId: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    const member = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: user.sub },
+    });
+    if (!member || member.role !== 'ADMIN') {
+      throw new ForbiddenException('Hanya admin yang bisa demote');
+    }
+    await this.prisma.groupMember.updateMany({
+      where: { groupId, userId: memberId },
+      data: { role: 'MEMBER' },
+    });
+    return { ok: true };
+  }
+
+  @Post('groups/:groupId/transfer-admin')
+  async transferAdmin(
+    @Param('groupId') groupId: string,
+    @Body('targetUserId') targetUserId: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!user?.sub) {
+      throw new BadRequestException('User tidak terautentikasi');
+    }
+    if (!targetUserId) {
+      throw new BadRequestException('targetUserId harus diisi');
+    }
+    const currentAdmin = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: user.sub, role: 'ADMIN' },
+    });
+    if (!currentAdmin) {
+      throw new ForbiddenException('Hanya admin yang bisa transfer');
+    }
+    const targetMember = await this.prisma.groupMember.findFirst({
+      where: { groupId, userId: targetUserId },
+    });
+    if (!targetMember) {
+      throw new BadRequestException('Target bukan anggota grup');
+    }
+    await this.prisma.groupMember.updateMany({
+      where: { groupId, role: 'ADMIN' },
+      data: { role: 'MODERATOR' },
+    });
+    await this.prisma.groupMember.updateMany({
+      where: { groupId, userId: targetUserId },
+      data: { role: 'ADMIN' },
+    });
+    return { ok: true };
   }
 }

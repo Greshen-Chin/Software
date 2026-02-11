@@ -8,6 +8,7 @@ import { ScheduleModule } from './modules/schedule/schedule.module';
 import { SocialModule } from './modules/social/social.module';
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 import { ChatModule } from './modules/chat/chat.module';
+import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ChatModule } from './modules/chat/chat.module';
     ScheduleModule,
     SocialModule,
     ChatModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

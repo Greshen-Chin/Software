@@ -1,21 +1,70 @@
 <script setup>
 import { computed } from 'vue';
 import { useTaskStore } from '../stores/taskStore';
+import { useScheduleStore } from '../stores/scheduleStore';
 
 const taskStore = useTaskStore();
+const scheduleStore = useScheduleStore();
 
 const completionRate = computed(() => {
-  const total = taskStore.tasks.length || 1;
-  return Math.round((taskStore.stats.done / total) * 100);
+  const doneTotal = Number(localStorage.getItem('doneTotal') || '0');
+  const total = taskStore.tasks.length + doneTotal;
+  if (total === 0) return 0;
+  return Math.round((doneTotal / total) * 100);
+});
+
+const streak = computed(() => {
+  const dates = JSON.parse(localStorage.getItem('doneDates') || '[]');
+  if (dates.length === 0) return 0;
+  const set = new Set(dates);
+  let count = 0;
+  const today = new Date();
+  while (true) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - count);
+    const key = d.toISOString().slice(0, 10);
+    if (!set.has(key)) break;
+    count += 1;
+  }
+  return count;
 });
 
 const progressAngle = computed(() => {
   return (completionRate.value / 100) * 360;
 });
+
+const weekDays = computed(() => {
+  const start = new Date();
+  const day = start.getDay();
+  const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(start.setDate(diff));
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+});
+
+const weeklyProgress = computed(() => {
+  return weekDays.value.map((date) => {
+    const tasks = taskStore.tasks.filter((t) => {
+      const d = new Date(t.deadline);
+      return (
+        d.getFullYear() === date.getFullYear() &&
+        d.getMonth() === date.getMonth() &&
+        d.getDate() === date.getDate()
+      );
+    });
+    const avg = tasks.length
+      ? Math.round(tasks.reduce((sum, t) => sum + (t.progress || 0), 0) / tasks.length)
+      : 0;
+    return { date, value: avg };
+  });
+});
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+  <div class="card-soft p-6 rounded-[2rem]">
     <h4 class="font-bold text-slate-800 mb-6 text-xl">Statistik Produktivitas</h4>
     
     <!-- Progress Circle -->
@@ -68,21 +117,15 @@ const progressAngle = computed(() => {
       </div>
     </div>
 
-    <!-- Weekly Progress -->
     <div class="mt-6 pt-6 border-t border-slate-100">
-      <h5 class="text-sm font-bold text-slate-600 mb-3">Progress Mingguan</h5>
-      <div class="space-y-2">
-        <div v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="day" class="flex items-center gap-3">
-          <span class="text-xs font-bold text-slate-400 w-8">{{ day }}</span>
-          <div class="flex-1 bg-slate-100 rounded-full h-2">
-            <div
-              class="bg-indigo-500 h-2 rounded-full transition-all"
-              :style="{ width: Math.random() * 100 + '%' }"
-            ></div>
-          </div>
-          <span class="text-xs font-bold text-slate-600 w-8 text-right">
-            {{ Math.floor(Math.random() * 100) }}%
-          </span>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold text-slate-400 uppercase">Streak</p>
+          <p class="text-2xl font-black text-slate-900">{{ streak }} hari</p>
+        </div>
+        <div class="text-right">
+          <p class="text-xs font-bold text-slate-400 uppercase">Completion Rate</p>
+          <p class="text-2xl font-black text-slate-900">{{ completionRate }}%</p>
         </div>
       </div>
     </div>

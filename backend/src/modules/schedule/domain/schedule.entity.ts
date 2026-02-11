@@ -12,6 +12,12 @@ export enum ScheduleColor {
   RED = 'red',
 }
 
+export enum ScheduleImportance {
+  LOW = 'LOW',
+  NORMAL = 'NORMAL',
+  HIGH = 'HIGH',
+}
+
 export class Schedule {
   constructor(
     public readonly id: string,
@@ -20,6 +26,8 @@ export class Schedule {
     public endTime: Date,
     public type: ScheduleType,
     public color: ScheduleColor,
+    public importance: ScheduleImportance,
+    public progress: number,
     public description?: string,
     public userId?: string,
     public groupId?: string,
@@ -33,6 +41,9 @@ export class Schedule {
     }
     if (this.title.length < 3) {
       throw new Error('Judul terlalu pendek');
+    }
+    if (this.progress < 0 || this.progress > 100) {
+      throw new Error('Progress harus antara 0 - 100');
     }
     const duration = this.endTime.getTime() - this.startTime.getTime();
     if (duration < 0) {
